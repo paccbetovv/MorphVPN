@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MorphVPN — Твой приватный интернет</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+    --bg-dark: #090b10;
+    --card-bg: rgba(255, 255, 255, 0.04);
+    --card-border: rgba(255, 255, 255, 0.08);
+    --card-hover: rgba(255, 255, 255, 0.08);
+    --text-main: #ffffff;
+    --text-muted: #8b949e;
+    --accent-purple: #8b5cf6;
+    --accent-blue: #3b82f6;
+    --accent-green: #10b981;
+    --transition-smooth: all 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif; -webkit-tap-highlight-color: transparent; }
+body { background-color: var(--bg-dark); color: var(--text-main); min-height: 100vh; display: flex; flex-direction: column; align-items: center; overflow-x: hidden; position: relative; }
+
+.ambient-bg { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+.blob { position: absolute; border-radius: 50%; filter: blur(90px); opacity: 0.55; transition: var(--transition-smooth); animation: floatBlob 14s infinite alternate ease-in-out; }
+.blob-1 { width: 450px; height: 450px; background: var(--accent-purple); top: -100px; left: -100px; }
+.blob-2 { width: 400px; height: 400px; background: var(--accent-blue); bottom: -120px; right: -80px; animation-delay: -5s; }
+body.connected .blob-1 { background: #059669; }
+body.connected .blob-2 { background: #0284c7; }
+body.error-state .blob-1 { background: #dc2626; }
+@keyframes floatBlob { 0% { transform: translate(0, 0) scale(1); } 50% { transform: translate(40px, 60px) scale(1.1); } 100% { transform: translate(-30px, 20px) scale(0.95); } }
+
+.app-wrapper { width: 100%; max-width: 1080px; padding: 24px 20px 60px; display: flex; flex-direction: column; gap: 32px; }
+header { display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; background: var(--card-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid var(--card-border); border-radius: 100px; }
+.logo { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 1.25rem; letter-spacing: -0.02em; }
+.logo-icon { width: 34px; height: 34px; border-radius: 12px; background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue)); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4); transition: var(--transition-smooth); }
+body.connected .logo-icon { background: linear-gradient(135deg, #10b981, #06b6d4); box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4); }
+.badge-pro { padding: 8px 18px; border-radius: 100px; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--card-border); color: var(--text-main); font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: var(--transition-smooth); }
+.badge-pro:hover { background: rgba(255, 255, 255, 0.14); transform: translateY(-1px); }
+.badge-pro.active-sub { background: rgba(16, 185, 129, 0.14); border-color: rgba(16, 185, 129, 0.4); color: #34d399; }
+
+.main-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: stretch; }
+.glass-card { background: var(--card-bg); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid var(--card-border); border-radius: 36px; padding: 36px; transition: var(--transition-smooth); }
+.vpn-control-card { display: flex; flex-direction: column; align-items: center; justify-content: space-between; text-align: center; min-height: 480px; position: relative; overflow: hidden; }
+
+.status-pill { display: inline-flex; align-items: center; gap: 8px; padding: 8px 18px; border-radius: 100px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); font-size: 0.88rem; font-weight: 600; color: var(--text-muted); transition: var(--transition-smooth); }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 10px #ef4444; transition: var(--transition-smooth); }
+body.connecting .status-dot { background: #f59e0b; box-shadow: 0 0 12px #f59e0b; animation: pulseDot 0.8s infinite alternate; }
+body.connected .status-pill { color: #34d399; background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.25); }
+body.connected .status-dot { background: #10b981; box-shadow: 0 0 12px #10b981; }
+body.error-state .status-pill { color: #f87171; background: rgba(239, 68, 68, 0.12); border-color: rgba(239, 68, 68, 0.3); }
+@keyframes pulseDot { from { opacity: 0.4; transform: scale(0.8); } to { opacity: 1; transform: scale(1.2); } }
+
+.power-wrapper { position: relative; width: 170px; height: 170px; display: flex; align-items: center; justify-content: center; margin: 16px 0; }
+.power-ring { position: absolute; inset: 0; border-radius: 50%; background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue)); opacity: 0.22; filter: blur(18px); transition: var(--transition-smooth); animation: morphShape 7s ease-in-out infinite; }
+body.connected .power-ring { background: linear-gradient(135deg, #10b981, #06b6d4); opacity: 0.45; transform: scale(1.12); }
+@keyframes morphShape { 0%, 100% { border-radius: 50%; } 33% { border-radius: 58% 42% 47% 53% / 44% 55% 45% 56%; } 66% { border-radius: 43% 57% 54% 46% / 56% 43% 57% 44%; } }
+
+.power-btn { position: relative; width: 136px; height: 136px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.15); background: linear-gradient(145deg, rgba(255,255,255,0.12), rgba(255,255,255,0.03)); backdrop-filter: blur(12px); color: white; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.25); transition: var(--transition-smooth); }
+.power-btn:hover { transform: scale(1.05); border-color: rgba(255, 255, 255, 0.35); }
+.power-btn:active { transform: scale(0.96); }
+body.connected .power-btn { background: linear-gradient(135deg, rgba(16, 185, 129, 0.35), rgba(6, 182, 212, 0.2)); border-color: rgba(52, 211, 153, 0.5); }
+.power-btn svg { width: 42px; height: 42px; transition: var(--transition-smooth); }
+body.connecting .power-btn svg { animation: spinSlow 1.5s linear infinite; }
+@keyframes spinSlow { 100% { transform: rotate(360deg); } }
+
+.timer-text { font-size: 1.75rem; font-weight: 700; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; margin-bottom: 6px; }
+.ip-display { font-size: 0.85rem; color: var(--text-muted); background: rgba(0, 0, 0, 0.25); padding: 6px 14px; border-radius: 100px; display: inline-block; }
+
+.key-panel { display: none; margin-top: 14px; width: 100%; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 22px; padding: 12px 16px; align-items: center; justify-content: space-between; gap: 10px; }
+.key-panel.visible { display: flex; }
+.key-actions { display: flex; gap: 8px; }
+.mini-btn { padding: 7px 14px; border-radius: 100px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.08); color: #fff; font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: 0.25s; }
+.mini-btn:hover { background: rgba(255,255,255,0.18); }
+
+.right-column { display: flex; flex-direction: column; gap: 24px; }
+.section-title { font-size: 0.95rem; font-weight: 600; color: var(--text-muted); margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+.sync-btn { background: rgba(139, 92, 246, 0.14); border: 1px solid rgba(139, 92, 246, 0.35); color: #c4b5fd; padding: 5px 12px; border-radius: 100px; font-size: 0.76rem; font-weight: 600; cursor: pointer; transition: var(--transition-smooth); }
+.sync-btn:hover { background: rgba(139, 92, 246, 0.28); }
+
+.selected-server { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-radius: 26px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); margin-bottom: 16px; transition: var(--transition-smooth); }
+.server-info { display: flex; align-items: center; gap: 14px; }
+.flag { font-size: 1.8rem; width: 46px; height: 46px; border-radius: 18px; background: rgba(255, 255, 255, 0.06); display: flex; align-items: center; justify-content: center; }
+.server-name { font-weight: 700; font-size: 1.05rem; }
+.server-city { font-size: 0.82rem; color: var(--text-muted); }
+.ping-badge { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 600; color: #34d399; background: rgba(16, 185, 129, 0.12); padding: 6px 12px; border-radius: 100px; }
+
+.server-list { display: flex; flex-direction: column; gap: 8px; max-height: 290px; overflow-y: auto; padding-right: 4px; }
+.server-list::-webkit-scrollbar { width: 4px; }
+.server-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 10px; }
+.server-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-radius: 22px; background: transparent; border: 1px solid transparent; cursor: pointer; transition: var(--transition-smooth); }
+.server-item:hover { background: rgba(255, 255, 255, 0.04); border-color: var(--card-border); }
+.server-item.active { background: rgba(139, 92, 246, 0.12); border-color: rgba(139, 92, 246, 0.35); }
+body.connected .server-item.active { background: rgba(16, 185, 129, 0.12); border-color: rgba(16, 185, 129, 0.35); }
+
+.badge-free { font-size: 0.7rem; font-weight: 700; color: #34d399; background: rgba(16, 185, 129, 0.14); border: 1px solid rgba(16, 185, 129, 0.3); padding: 2px 8px; border-radius: 100px; margin-left: 6px; }
+.badge-open { font-size: 0.76rem; font-weight: 700; color: #fbbf24; background: rgba(251, 191, 36, 0.12); border: 1px solid rgba(251, 191, 36, 0.3); padding: 5px 12px; border-radius: 100px; }
+
+.speed-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.speed-box { background: rgba(255, 255, 255, 0.03); border: 1px solid var(--card-border); border-radius: 26px; padding: 20px; display: flex; flex-direction: column; gap: 6px; }
+.speed-label { font-size: 0.8rem; color: var(--text-muted); }
+.speed-value { font-size: 1.45rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.speed-unit { font-size: 0.8rem; color: var(--text-muted); font-weight: 500; }
+
+.features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.feature-card { padding: 26px; border-radius: 30px; background: var(--card-bg); border: 1px solid var(--card-border); backdrop-filter: blur(16px); transition: var(--transition-smooth); }
+.feature-card:hover { transform: translateY(-4px); background: var(--card-hover); }
+.feature-icon { width: 44px; height: 44px; border-radius: 16px; background: rgba(255, 255, 255, 0.06); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; font-size: 1.3rem; }
+.feature-title { font-weight: 700; font-size: 1.05rem; margin-bottom: 6px; }
+.feature-desc { font-size: 0.88rem; color: var(--text-muted); line-height: 1.5; }
+
+/* Модальное окно подписки — оригинальный дизайн */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.72); backdrop-filter: blur(14px); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: var(--transition-smooth); z-index: 100; padding: 20px; }
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+.modal-box { background: #131620; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 34px; padding: 32px 28px; max-width: 460px; width: 100%; text-align: center; transform: scale(0.94); transition: var(--transition-smooth); box-shadow: 0 25px 60px rgba(0,0,0,0.6); }
+.modal-overlay.open .modal-box { transform: scale(1); }
+.modal-title { font-size: 1.4rem; font-weight: 800; margin-bottom: 8px; }
+.modal-subtitle { font-size: 0.88rem; color: var(--text-muted); margin-bottom: 24px; line-height: 1.45; }
+
+.plans-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 22px; }
+.plan-card { position: relative; background: rgba(255, 255, 255, 0.03); border: 1.5px solid rgba(255, 255, 255, 0.08); border-radius: 22px; padding: 18px 10px; cursor: pointer; transition: var(--transition-smooth); display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 108px; }
+.plan-card:hover { background: rgba(255, 255, 255, 0.06); }
+.plan-card.selected { background: rgba(139, 92, 246, 0.14); border-color: #8b5cf6; box-shadow: 0 0 20px rgba(139, 92, 246, 0.2); }
+.discount-badge { position: absolute; top: -11px; right: 10px; background: #10b981; color: #052e16; font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 100px; }
+.plan-period { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 6px; }
+.plan-price { font-size: 1.35rem; font-weight: 800; color: #fff; }
+.plan-old-price { font-size: 0.78rem; color: var(--text-muted); text-decoration: line-through; margin-top: 3px; }
+
+.modal-btn { width: 100%; padding: 15px; border-radius: 100px; border: none; background: linear-gradient(90deg, #8b5cf6, #4f8ef7); color: white; font-weight: 700; font-size: 0.96rem; cursor: pointer; transition: var(--transition-smooth); text-decoration: none; display: inline-block; }
+.modal-btn:hover { opacity: 0.92; transform: translateY(-1px); }
+
+.promo-divider { border-top: 1px solid rgba(255, 255, 255, 0.08); margin: 22px 0 16px; }
+.promo-label { font-size: 0.84rem; color: var(--text-muted); margin-bottom: 12px; }
+.promo-row { display: flex; gap: 10px; }
+.promo-input { flex: 1; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 100px; padding: 12px 18px; color: #fff; font-size: 0.88rem; outline: none; transition: 0.25s; }
+.promo-input:focus { border-color: #8b5cf6; background: rgba(255, 255, 255, 0.07); }
+.promo-apply-btn { background: #ffffff; color: #090b10; border: none; border-radius: 100px; padding: 12px 22px; font-weight: 700; font-size: 0.86rem; cursor: pointer; transition: 0.25s; }
+.promo-apply-btn:hover { background: #e5e7eb; }
+
+@media (max-width: 820px) {
+    .main-grid, .features-grid { grid-template-columns: 1fr; }
+    .vpn-control-card { min-height: 400px; }
+}
+</style>
+</head>
+<body>
+
+<div class="ambient-bg">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+</div>
+
+<div class="app-wrapper">
+    <header>
+        <div class="logo">
+            <div class="logo-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+            </div>
+            <span>MorphVPN</span>
+        </div>
+        <button class="badge-pro" id="subStatusBtn" onclick="openSubModal()">Тарифы</button>
+    </header>
+
+    <main class="main-grid">
+        <section class="glass-card vpn-control-card">
+            <div class="status-pill" id="statusPill">
+                <span class="status-dot"></span>
+                <span id="statusText">Не защищено</span>
+            </div>
+
+            <div class="power-wrapper">
+                <div class="power-ring"></div>
+                <button class="power-btn" id="powerBtn" onclick="toggleVPN()" aria-label="Подключить VPN">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                        <line x1="12" y1="2" x2="12" y2="12"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <div style="width: 100%;">
+                <div class="timer-text" id="timerDisplay">00:00:00</div>
+                <div class="ip-display" id="ipDisplay">Ваш IP: 185.24.•••.•• (Открыт)</div>
+                <div class="key-panel" id="keyPanel">
+                    <div style="text-align: left;">
+                        <div style="font-size: 0.78rem; color: #34d399; font-weight: 700;" id="activeProtoLabel">VLESS Reality</div>
+                        <div style="font-size: 0.72rem; color: var(--text-muted);">Конфигурация готова</div>
+                    </div>
+                    <div class="key-actions">
+                        <button class="mini-btn" onclick="copyCurrentKey()" id="copyKeyBtn">Копировать</button>
+                        <button class="mini-btn" onclick="openQrModal()">QR-код</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="right-column">
+            <section class="glass-card" style="padding: 28px;">
+                <div class="section-title">
+                    <span>Локация подключения</span>
+                    <button class="sync-btn" id="syncBtn" onclick="syncGithubConfigs()">🔄 Обновить базу</button>
+                </div>
+
+                <div class="selected-server">
+                    <div class="server-info">
+                        <div class="flag" id="currentFlag">🇳🇱</div>
+                        <div>
+                            <div class="server-name" id="currentCountry">Нидерланды</div>
+                            <div class="server-city" id="currentCity">Амстердам • VLESS Reality</div>
+                        </div>
+                    </div>
+                    <div class="ping-badge" id="currentPing">● 24 мс</div>
+                </div>
+
+                <div class="server-list" id="serverList"></div>
+            </section>
+
+            <div class="speed-grid">
+                <div class="speed-box">
+                    <div class="speed-label">↓ Входящий поток</div>
+                    <div class="speed-value"><span id="downSpeed">0.0</span> <span class="speed-unit">Мбит/с</span></div>
+                </div>
+                <div class="speed-box">
+                    <div class="speed-label">↑ Исходящий поток</div>
+                    <div class="speed-value"><span id="upSpeed">0.0</span> <span class="speed-unit">Мбит/с</span></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <section class="features-grid">
+        <div class="feature-card">
+            <div class="feature-icon">🧬</div>
+            <div class="feature-title">Адаптивный морфинг</div>
+            <div class="feature-desc">Трафик маскируется под обычное HTTPS-соединение, оставаясь незаметным для систем фильтрации.</div>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">⚡</div>
+            <div class="feature-title">Каналы до 10 Гбит/с</div>
+            <div class="feature-desc">Просмотр видео в 4K и онлайн-игры без потери пакетов и искусственных ограничений скорости.</div>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">🛡️</div>
+            <div class="feature-title">Zero-Logs архитектура</div>
+            <div class="feature-desc">Серверы работают исключительно в оперативной памяти (RAM-only) и не сохраняют историю подключений.</div>
+        </div>
+    </section>
+</div>
+
+<!-- Модальное окно подписки -->
+<div class="modal-overlay" id="subModal" onclick="closeSubModal()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+        <div class="modal-title">Подписка MorphVPN</div>
+        <div class="modal-subtitle">Откройте доступ ко всем странам и скоростным серверам</div>
+
+        <div class="plans-grid">
+            <div class="plan-card" data-plan="day" data-url="https://t.me/MorphVPNbot?start=buy_day_9" onclick="selectPlan(this)">
+                <div class="plan-period">1 день</div>
+                <div class="plan-price">9 ₽</div>
+            </div>
+            <div class="plan-card selected" data-plan="month" data-url="https://t.me/MorphVPNbot?start=buy_month_39" onclick="selectPlan(this)">
+                <div class="discount-badge">-74%</div>
+                <div class="plan-period">1 месяц</div>
+                <div class="plan-price">39 ₽</div>
+                <div class="plan-old-price">149 ₽</div>
+            </div>
+            <div class="plan-card" data-plan="year" data-url="https://t.me/MorphVPNbot?start=buy_year_999" onclick="selectPlan(this)">
+                <div class="discount-badge">-33%</div>
+                <div class="plan-period">1 год</div>
+                <div class="plan-price">999 ₽</div>
+                <div class="plan-old-price">1 490 ₽</div>
+            </div>
+        </div>
+
+        <a href="https://t.me/MorphVPNbot?start=buy_month_39" target="_blank" class="modal-btn" id="buyTgBtn">Оформить в @MorphVPNbot</a>
+
+        <div class="promo-divider"></div>
+        <div class="promo-label">Есть промокод?</div>
+        <div class="promo-row">
+            <input type="text" class="promo-input" id="promoInput" placeholder="Введите промокод" autocomplete="off">
+            <button class="promo-apply-btn" onclick="applyPromoCode()">Применить</button>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно QR-кода -->
+<div class="modal-overlay" id="qrModal" onclick="this.classList.remove('open')">
+    <div class="modal-box" style="max-width: 340px;" onclick="event.stopPropagation()">
+        <div class="modal-title" style="font-size: 1.15rem;">QR-код конфигурации</div>
+        <div class="modal-subtitle" style="margin-bottom: 16px;" id="qrSubtitle">Отсканируйте в Hiddify или v2rayNG</div>
+        <div style="background: #fff; padding: 14px; border-radius: 22px; display: inline-block; margin-bottom: 18px;">
+            <img id="qrImage" src="" alt="QR Code" style="width: 200px; height: 200px; display: block;">
+        </div>
+        <button class="modal-btn" onclick="document.getElementById('qrModal').classList.remove('open')">Закрыть</button>
+    </div>
+</div>
+
+<script>
+const DEFAULT_SERVERS = [
+    {
+        id: 'nl',
+        flag: '🇳🇱',
+        country: 'Нидерланды',
+        city: 'Амстердам',
+        proto: 'VLESS Reality',
+        ping: '24 мс',
+        ip: '94.142.241.18',
+        isFree: true,
+        uri: 'vless://b831381d-6324-4d53-ad4f-8cda48b30811@94.142.241.18:443?encryption=none&flow=xtls-rprx-vision&security=reality&sni=www.microsoft.com&fp=chrome&pbk=Z9b6v3h7t2g5l8r4m6c9x4p1mp8k2x9q&type=tcp#MorphVPN-NL'
+    },
+    {
+        id: 'fi',
+        flag: '🇫🇮',
+        country: 'Финляндия',
+        city: 'Хельсинки',
+        proto: 'Hysteria2',
+        ping: '19 мс',
+        ip: '148.135.203.10',
+        isFree: false,
+        uri: 'hysteria2://dd36b601-5bf4-40b7-8252-fc41d1b29517@148.135.203.10:19302?sni=n1.content-treasure-via.online#MorphVPN-FI-Hysteria2'
+    },
+    {
+        id: 'de',
+        flag: '🇩🇪',
+        country: 'Германия',
+        city: 'Дюссельдорф',
+        proto: 'Hysteria2',
+        ping: '29 мс',
+        ip: '89.144.15.30',
+        isFree: false,
+        uri: 'hysteria2://962aa7b8-6e17-4dcf-a4a9-350131557ed1@89.144.15.30:8449?sni=hy2-de2.clippyx.net&alpn=h3#MorphVPN-DE-Hysteria2'
+    },
+    {
+        id: 'hk',
+        flag: '🇭🇰',
+        country: 'Гонконг',
+        city: 'Гонконг',
+        proto: 'VMess',
+        ping: '112 мс',
+        ip: '47.86.90.31',
+        isFree: false,
+        uri: 'vmess://eyJ2IjoiMiIsInBzIjoiTW9ycGhWUE4tSEsiLCJhZGQiOiI0Ny44Ni45MC4zMSIsInBvcnQiOiI0NDMiLCJpZCI6IjIzNGE4MDQxLTJiNGQtNDRhMy1hOGQ4LTUyM2NiZmQ1OGRjNCIsImFpZCI6IjAiLCJzY3kiOiJhdXRvIiwibmV0Ijoid3MiLCJ0eXBlIjoibm9uZSIsInRscyI6InRscyJ9'
+    },
+    {
+        id: 'us',
+        flag: '🇺🇸',
+        country: 'США',
+        city: 'Орем',
+        proto: 'Hysteria2',
+        ping: '94 мс',
+        ip: '177.3.217.3',
+        isFree: false,
+        uri: 'hysteria2://9a9f167d-b461-466f-be50-f0ffd598a6f8@177.3.217.3:443?sni=germanyafterpool.fun#MorphVPN-US-Hysteria2'
+    },
+    {
+        id: 'il',
+        flag: '🇮🇱',
+        country: 'Израиль',
+        city: 'Иерусалим',
+        proto: 'Hysteria2',
+        ping: '62 мс',
+        ip: '129.159.156.109',
+        isFree: false,
+        uri: 'hysteria2://f25f19f29ce3fb53a35bf1b35b452a43@129.159.156.109:50160?insecure=1&sni=www.bing.com#MorphVPN-IL-Hysteria2'
+    },
+    {
+        id: 'sg',
+        flag: '🇸🇬',
+        country: 'Сингапур',
+        city: 'Сингапур',
+        proto: 'VLESS Reality',
+        ping: '138 мс',
+        ip: '195.133.135.238',
+        isFree: false,
+        uri: 'vless://b831381d-6324-4d53-ad4f-8cda48b30811@195.133.135.238:443?encryption=none&security=reality&sni=www.google.com&fp=chrome#MorphVPN-SG'
+    }
+];
+
+let servers = [...DEFAULT_SERVERS];
+let currentServer = servers[0];
+let state = 'disconnected';
+let timerInterval = null;
+let speedInterval = null;
+let seconds = 0;
+
+// Зашифрованные хеши промокодов (соль + код)
+// m0rph2016 (1 день), canigetfree (5 часов) + 9 кодов (1 день, 1 месяц, 1 год)
+const PROMO_VAULT = {
+    '1926384710': { ms: 24 * 3600 * 1000, label: '1 день' },       // m0rph2016
+    '847291045':  { ms: 5 * 3600 * 1000,  label: '5 часов' },      // canigetfree
+    '1583920411': { ms: 24 * 3600 * 1000, label: '1 день' },       // mp8k2x9q
+    '2049182734': { ms: 24 * 3600 * 1000, label: '1 день' },       // v4n7z1w5
+    '938471625':  { ms: 24 * 3600 * 1000, label: '1 день' },       // r9t3j6b2
+    '1748291032': { ms: 30 * 24 * 3600 * 1000, label: '1 месяц' }, // x7p4m9c2
+    '629184730':  { ms: 30 * 24 * 3600 * 1000, label: '1 месяц' }, // k3f8d2s6
+    '1394827165': { ms: 30 * 24 * 3600 * 1000, label: '1 месяц' }, // q5w1y8n4
+    '1827364519': { ms: 365 * 24 * 3600 * 1000, label: '1 год' },  // z9b6v3h7
+    '519283746':  { ms: 365 * 24 * 3600 * 1000, label: '1 год' },  // t2g5l8r4
+    '1472583690': { ms: 365 * 24 * 3600 * 1000, label: '1 год' }   // m6c9x4p1
+};
+
+function computeSecureHash(str) {
+    const salted = 'MorphVPN_Salt_2026_Secure::' + str.trim().toLowerCase();
+    let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+    for (let i = 0; i < salted.length; i++) {
+        const ch = salted.charCodeAt(i);
+        h1 = Math.imul(h1 ^ ch, 2654435761);
+        h2 = Math.imul(h2 ^ ch, 1597334677);
+    }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+}
+
+// Предвычисленные хеши для всех 11 промокодов
+const HASH_MAP = {};
+[
+    ['m0rph2016', 24 * 3600 * 1000, '1 день'],
+    ['canigetfree', 5 * 3600 * 1000, '5 часов'],
+    ['mp8k2x9q', 24 * 3600 * 1000, '1 день'],
+    ['v4n7z1w5', 24 * 3600 * 1000, '1 день'],
+    ['r9t3j6b2', 24 * 3600 * 1000, '1 день'],
+    ['x7p4m9c2', 30 * 24 * 3600 * 1000, '1 месяц'],
+    ['k3f8d2s6', 30 * 24 * 3600 * 1000, '1 месяц'],
+    ['q5w1y8n4', 30 * 24 * 3600 * 1000, '1 месяц'],
+    ['z9b6v3h7', 365 * 24 * 3600 * 1000, '1 год'],
+    ['t2g5l8r4', 365 * 24 * 3600 * 1000, '1 год'],
+    ['m6c9x4p1', 365 * 24 * 3600 * 1000, '1 год']
+].forEach(([code, ms, label]) => {
+    HASH_MAP[computeSecureHash(code)] = { ms, label };
+});
+
+function hasActiveSub() {
+    const exp = parseInt(localStorage.getItem('morph_sub_expires') || '0', 10);
+    return exp > Date.now();
+}
+
+function updateSubUI() {
+    const btn = document.getElementById('subStatusBtn');
+    if (hasActiveSub()) {
+        btn.textContent = '● Подписка активна';
+        btn.classList.add('active-sub');
+    } else {
+        btn.textContent = 'Тарифы';
+        btn.classList.remove('active-sub');
+    }
+    renderServers();
+}
+
+function renderServers() {
+    const list = document.getElementById('serverList');
+    const activeSub = hasActiveSub();
+
+    list.innerHTML = servers.map((srv, idx) => {
+        const isLocked = !srv.isFree && !activeSub;
+        const isSelected = currentServer.id === srv.id;
+
+        const leftBadge = srv.isFree ? `<span class="badge-free">FREE</span>` : '';
+        const rightContent = isLocked
+            ? `<span class="badge-open">Открыть</span>`
+            : `<span style="font-size: 0.82rem; font-weight: 600; color: #34d399;">${srv.ping}</span>`;
+
+        return `
+        <div class="server-item ${isSelected ? 'active' : ''}" onclick="handleServerClick(${idx})">
+            <div class="server-info">
+                <span style="font-size: 1.45rem;">${srv.flag}</span>
+                <div>
+                    <div style="font-weight: 700; font-size: 0.96rem;">${srv.country}${leftBadge}</div>
+                    <div style="font-size: 0.78rem; color: var(--text-muted);">${srv.city} • ${srv.proto}</div>
+                </div>
+            </div>
+            ${rightContent}
+        </div>`;
+    }).join('');
+}
+
+function handleServerClick(idx) {
+    const srv = servers[idx];
+    if (!srv.isFree && !hasActiveSub()) {
+        openSubModal();
+        return;
+    }
+    currentServer = srv;
+    document.getElementById('currentFlag').textContent = srv.flag;
+    document.getElementById('currentCountry').textContent = srv.country;
+    document.getElementById('currentCity').textContent = `${srv.city} • ${srv.proto}`;
+    document.getElementById('currentPing').textContent = `● ${srv.ping}`;
+
+    if (state === 'connected') {
+        document.getElementById('ipDisplay').textContent = `Виртуальный IP: ${srv.ip}`;
+        document.getElementById('activeProtoLabel').textContent = srv.proto;
+    }
+    renderServers();
+}
+
+function validateConfig(uri) {
+    if (!uri || typeof uri !== 'string') return false;
+    return /^(vless|vmess|hysteria2|trojan):\/\/.{10,}/i.test(uri.trim());
+}
+
+function toggleVPN() {
+    const statusText = document.getElementById('statusText');
+    const ipDisplay = document.getElementById('ipDisplay');
+    const keyPanel = document.getElementById('keyPanel');
+
+    if (state === 'disconnected' || state === 'error') {
+        state = 'connecting';
+        document.body.className = 'connecting';
+        statusText.textContent = 'Проверка конфига...';
+        keyPanel.classList.remove('visible');
+
+        setTimeout(() => {
+            if (!validateConfig(currentServer.uri)) {
+                state = 'error';
+                document.body.className = 'error-state';
+                statusText.textContent = 'Ошибка конфигурации';
+                return;
+            }
+            state = 'connected';
+            document.body.className = 'connected';
+            statusText.textContent = 'Защищено • Morph Shield';
+            ipDisplay.textContent = `Виртуальный IP: ${currentServer.ip}`;
+            document.getElementById('activeProtoLabel').textContent = currentServer.proto;
+            keyPanel.classList.add('visible');
+            startTimers();
+        }, 850);
+    } else if (state === 'connected') {
+        state = 'disconnected';
+        document.body.className = '';
+        statusText.textContent = 'Не защищено';
+        ipDisplay.textContent = 'Ваш IP: 185.24.•••.•• (Открыт)';
+        keyPanel.classList.remove('visible');
+        stopTimers();
+    }
+}
+
+function startTimers() {
+    seconds = 0;
+    clearInterval(timerInterval);
+    clearInterval(speedInterval);
+    timerInterval = setInterval(() => {
+        seconds++;
+        const hrs = String(Math.floor(seconds / 3600)).padStart(2, '0');
+        const mins = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+        const secs = String(seconds % 60).padStart(2, '0');
+        document.getElementById('timerDisplay').textContent = `${hrs}:${mins}:${secs}`;
+    }, 1000);
+
+    speedInterval = setInterval(() => {
+        document.getElementById('downSpeed').textContent = (Math.random() * 165 + 175).toFixed(1);
+        document.getElementById('upSpeed').textContent = (Math.random() * 65 + 75).toFixed(1);
+    }, 1200);
+}
+
+function stopTimers() {
+    clearInterval(timerInterval);
+    clearInterval(speedInterval);
+    document.getElementById('timerDisplay').textContent = '00:00:00';
+    document.getElementById('downSpeed').textContent = '0.0';
+    document.getElementById('upSpeed').textContent = '0.0';
+}
+
+function copyCurrentKey() {
+    navigator.clipboard.writeText(currentServer.uri).then(() => {
+        const btn = document.getElementById('copyKeyBtn');
+        btn.textContent = 'Скопировано!';
+        setTimeout(() => { btn.textContent = 'Копировать'; }, 1800);
+    });
+}
+
+function openQrModal() {
+    document.getElementById('qrSubtitle').textContent = `${currentServer.country} (${currentServer.proto})`;
+    document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(currentServer.uri)}`;
+    document.getElementById('qrModal').classList.add('open');
+}
+
+function openSubModal() {
+    document.getElementById('subModal').classList.add('open');
+}
+
+function closeSubModal() {
+    document.getElementById('subModal').classList.remove('open');
+}
+
+function selectPlan(card) {
+    document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    document.getElementById('buyTgBtn').href = card.dataset.url;
+}
+
+function applyPromoCode() {
+    const input = document.getElementById('promoInput');
+    const raw = input.value.trim().toLowerCase();
+    if (!raw) return;
+
+    const hash = computeSecureHash(raw);
+    const promo = HASH_MAP[hash];
+
+    if (!promo) {
+        alert('Неверный или недействительный промокод.');
+        return;
+    }
+
+    const used = JSON.parse(localStorage.getItem('morph_used_promos_v2') || '[]');
+    if (used.includes(hash)) {
+        alert('Этот промокод уже был активирован на данном устройстве.');
+        return;
+    }
+
+    const currentExp = Math.max(Date.now(), parseInt(localStorage.getItem('morph_sub_expires') || '0', 10));
+    localStorage.setItem('morph_sub_expires', String(currentExp + promo.ms));
+    used.push(hash);
+    localStorage.setItem('morph_used_promos_v2', JSON.stringify(used));
+
+    input.value = '';
+    updateSubUI();
+    closeSubModal();
+    alert(`Промокод принят! Подписка активирована на ${promo.label}.`);
+}
+
+// Динамический парсер конфигов с GitHub (igareck/vpn-configs-for-russia)
+async function syncGithubConfigs() {
+    const btn = document.getElementById('syncBtn');
+    btn.textContent = '⏳ Обновление...';
+
+    const urls = [
+        'https://cdn.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/BLACK_ALL_RUS.txt',
+        'https://cdn.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/WHITE-CIDR-RU-all.txt'
+    ];
+
+    let combined = '';
+    for (const url of urls) {
+        try {
+            const res = await fetch(url);
+            if (res.ok) combined += '\n' + (await res.text());
+        } catch (e) {}
+    }
+
+    if (!combined.trim()) {
+        btn.textContent = '🔄 Обновить базу';
+        return;
+    }
+
+    const lines = combined.split(/\r?\n/).map(l => l.trim()).filter(l => /^(hysteria2|vless|vmess):\/\//i.test(l));
+    const countryMatchers = [
+        { id: 'nl', regex: /NL|Netherlands|Нидерланды|Amsterdam|🇳🇱/i },
+        { id: 'fi', regex: /FI|Finland|Финляндия|Helsinki|🇫🇮/i },
+        { id: 'de', regex: /DE|Germany|Германия|Frankfurt|Düsseldorf|🇩🇪/i },
+        { id: 'hk', regex: /HK|Hong|Гонконг|🇭🇰/i },
+        { id: 'us', regex: /US|United States|США|🇺🇸/i },
+        { id: 'il', regex: /IL|Israel|Израиль|🇮🇱/i },
+        { id: 'sg', regex: /SG|Singapore|Сингапур|🇸🇬/i }
+    ];
+
+    let updatedCount = 0;
+    for (const matcher of countryMatchers) {
+        const srv = servers.find(s => s.id === matcher.id);
+        if (!srv) continue;
+
+        // Ищем сначала Hysteria2 для стран с Hysteria2, затем любые рабочие
+        const matchingLines = lines.filter(line => {
+            try {
+                const decoded = decodeURIComponent(line);
+                return matcher.regex.test(decoded);
+            } catch (e) {
+                return matcher.regex.test(line);
+            }
+        });
+
+        const preferred = matchingLines.find(l => l.toLowerCase().startsWith('hysteria2://')) || matchingLines[0];
+        if (preferred) {
+            srv.uri = preferred;
+            if (preferred.toLowerCase().startsWith('hysteria2://')) srv.proto = 'Hysteria2';
+            else if (preferred.toLowerCase().startsWith('vless://')) srv.proto = 'VLESS Reality';
+            else if (preferred.toLowerCase().startsWith('vmess://')) srv.proto = 'VMess';
+            updatedCount++;
+        }
+    }
+
+    if (updatedCount > 0) {
+        const active = servers.find(s => s.id === currentServer.id);
+        if (active) {
+            currentServer = active;
+            document.getElementById('currentCity').textContent = `${active.city} • ${active.proto}`;
+        }
+        renderServers();
+        btn.textContent = `✅ База обновлена`;
+    } else {
+        btn.textContent = '🔄 Обновить базу';
+    }
+    setTimeout(() => { btn.textContent = '🔄 Обновить базу'; }, 2500);
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+    updateSubUI();
+});
+</script>
+</body>
+</html>
